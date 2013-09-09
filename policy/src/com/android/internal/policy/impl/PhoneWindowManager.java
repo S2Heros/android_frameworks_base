@@ -338,10 +338,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mVolBtnMusicControls;
     boolean mIsLongPress;
 
-    // Behavior of force navbar development settings
-    boolean mDevMenuButtonEnabled;
-    boolean mDevBackButtonEnabled;
-
     // Behavior expanded desktop mode
     int mExpandedState;
     int mExpandedStyle;
@@ -446,9 +442,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mForcingShowNavBarLayer;
 
     int mExpandedDesktopStyle = -1;
-
-    boolean mDevForceNavbar = false;
-    boolean mForceOverflowButton = false;
 
     boolean mHideStatusBar;
 
@@ -682,18 +675,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.NAVIGATION_BAR_HEIGHT_LANDSCAPE), false, this,
-                    UserHandle.USER_ALL);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.DEV_FORCE_SHOW_NAVBAR), false, this,
-                    UserHandle.USER_ALL);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.DEV_MENU_BUTTON_ENABLED), false, this,
-                    UserHandle.USER_ALL);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.DEV_BACK_BUTTON_ENABLED), false, this,
-                    UserHandle.USER_ALL);
-            resolver.registerContentObserver(Settings.System.getUriFor(
-                    Settings.System.UI_FORCE_OVERFLOW_BUTTON), false, this,
                     UserHandle.USER_ALL);
 
             updateSettings();
@@ -1267,11 +1248,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         boolean keyRebindingEnabled = Settings.System.getIntForUser(resolver,
                 Settings.System.HARDWARE_KEY_REBINDING, 0, UserHandle.USER_CURRENT) == 1;
 
-        mDevMenuButtonEnabled = Settings.System.getIntForUser(resolver,
-                Settings.System.DEV_MENU_BUTTON_ENABLED, 1, UserHandle.USER_CURRENT) == 1;
-        mDevBackButtonEnabled = Settings.System.getIntForUser(resolver,
-                Settings.System.DEV_BACK_BUTTON_ENABLED, 1, UserHandle.USER_CURRENT) == 1;
-
         if (!keyRebindingEnabled) {
             mHasMenuKeyEnabled = hasMenu;
             return;
@@ -1398,10 +1374,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             // the navigation bar will provide more useful space for wide
             // screen movies.
             mCanHideNavigationBar = aspect < 9;
-        } else {
+        } else if (mHasNavigationBar) {
             // The navigation bar is at the right in landscape; it seems always
             // useful to hide it for showing a video.
             mCanHideNavigationBar = true;
+        } else {
+            mCanHideNavigationBar = false;
         }
 
         // For demo purposes, allow the rotation of the HDMI display to be controlled.
@@ -1520,20 +1498,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
             if (expandedDesktopStyle != mExpandedDesktopStyle) {
                 mExpandedDesktopStyle = expandedDesktopStyle;
-                updateDisplayMetrics = true;
-            }
-
-            boolean devForceNavbar = Settings.System.getIntForUser(resolver,
-                    Settings.System.DEV_FORCE_SHOW_NAVBAR, 0, UserHandle.USER_CURRENT) == 1;
-            if (devForceNavbar != mDevForceNavbar) {
-                mDevForceNavbar = devForceNavbar;
-                updateDisplayMetrics = true;
-            }
-
-            boolean forceOverflowButton = Settings.System.getIntForUser(resolver,
-                     Settings.System.UI_FORCE_OVERFLOW_BUTTON, 0, UserHandle.USER_CURRENT) == 1;
-            if (forceOverflowButton != mForceOverflowButton) {
-                mForceOverflowButton = forceOverflowButton;
                 updateDisplayMetrics = true;
             }
 
@@ -1942,7 +1906,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             // For the system navigation bar, we always place it at the bottom.
             return fullHeight - mNavigationBarHeightForRotation[rotation];
         }
-        if (hasNavigationBar() && !expandedDesktopHidesNavigationBar()) {
+        if (mHasNavigationBar && !expandedDesktopHidesNavigationBar()) {
             // For a basic navigation bar, when we are in portrait mode we place
             // the navigation bar to the bottom.
             if (!mNavigationBarCanMove || fullWidth < fullHeight) {
@@ -3215,7 +3179,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 navVisible = false;
                 navWidth = 0;
                 navHeight = 0;
-            } else if (hasNavigationBar() && !mCanHideNavigationBar) {
+            } else if (!mCanHideNavigationBar) {
                 navVisible = true;
             }
 
@@ -4255,7 +4219,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         final boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
         final boolean canceled = event.isCanceled();
         int keyCode = event.getKeyCode();
-        int scanCode = event.getScanCode();
 
         final boolean isInjected = (policyFlags & WindowManagerPolicy.FLAG_INJECTED) != 0;
 
@@ -4273,22 +4236,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
         final boolean isWakeKey = (policyFlags
                 & (WindowManagerPolicy.FLAG_WAKE | WindowManagerPolicy.FLAG_WAKE_DROPPED)) != 0;
-
-        // Ignore Menu button if it is disabled in Developer options 
-        if (scanCode != 0 && keyCode == KeyEvent.KEYCODE_MENU) {
-            if (!mDevMenuButtonEnabled) {
-                Log.i(TAG, "Ignoring Menu button: Disabled via Developer options");
-                return 0;
-            }
-        }
-
-        // Ignore Back button if it is disabled in Developer options
-        if (scanCode != 0 && keyCode == KeyEvent.KEYCODE_BACK) {
-            if (!mDevBackButtonEnabled) {
-                Log.i(TAG, "Ignoring Back button: Disabled via Developer options");
-                return 0;
-            }
-        }
 
         if (DEBUG_INPUT) {
             Log.d(TAG, "interceptKeyTq keycode=" + keyCode
@@ -5669,10 +5616,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // devices like it should without navbar. See for more details
     // PhoneWindowManager.java @Line 1115
     public boolean hasNavigationBar() {
-        return mHasNavigationBar || mDevForceNavbar;
-    }
-    
-    public boolean needsNavigationBar() {
         return mHasNavigationBar;
     }
 
