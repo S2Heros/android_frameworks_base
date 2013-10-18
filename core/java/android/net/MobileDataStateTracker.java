@@ -190,8 +190,7 @@ public class MobileDataStateTracker implements NetworkStateTracker {
     private class MobileDataStateReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            // Assume this isn't a provisioning network.
-            mNetworkInfo.setIsConnectedToProvisioningNetwork(false);
+
             if (intent.getAction().equals(TelephonyIntents.
                     ACTION_DATA_CONNECTION_CONNECTED_TO_PROVISIONING_APN)) {
                 String apnName = intent.getStringExtra(PhoneConstants.DATA_APN_KEY);
